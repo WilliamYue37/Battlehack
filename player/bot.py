@@ -1,7 +1,7 @@
 import random
 # from enum import Enum
 
-from battlehack20.stubs import *
+# from mybattle.stubs import *
 
 # This is an example bot written by the developers!
 # Use this to help write your own code, or run it against your bot to see how well you can do!

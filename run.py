@@ -4,7 +4,7 @@ import faulthandler
 import sys
 import threading
 
-from battlehack20 import CodeContainer, Game, BasicViewer, GameConstants
+from mybattle.engine import CodeContainer, Game, BasicViewer, GameConstants
 
 """
 This is a simple script for running bots and debugging them.
