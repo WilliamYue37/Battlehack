@@ -4,6 +4,10 @@ import faulthandler
 import sys
 import threading
 
+import tensorflow as tf
+from tf import keras
+import numpy as np
+
 from mybattle2.engine import CodeContainer, Game, BasicViewer, GameConstants
 
 """
@@ -73,7 +77,14 @@ def play_all(delay=0.8, keep_history=False, real_time=False):
 
     print(f'{game.winner} wins!')
 
-
+def train(num=1):
+    for i in range(num):
+        game1 = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
+                seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, )
+        while game1.running:
+            game1.turn()
+        pawn_ins, pawn_outs, lord_ins, lord_outs = game1.getTrainingData()
+    
 
 if __name__ == '__main__':
 
@@ -101,6 +112,20 @@ if __name__ == '__main__':
     # This is how you initialize a game,
     game = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
                 seed=args.seed, debug=args.debug, colored_logs=not args.raw_text)
+
+    pawn_model = keras.Sequential([
+        keras.layers.Dense(64, input_dim=78),
+        keras.layers.Dense(64, activation='relu'),
+        keras.layers.Dense(1)
+    ])
+    pawn_model.compile(optimizer='adam', loss='mean_squared_error')
+
+    lord_model = keras.Sequential([
+        keras.layers.Dense(64, input_dim=16*16*3),
+        keras.layers.Dense(64, activation='relu'),
+        keras.layers.Dense(1)
+    ])
+    lord_model.compile(optimizer='adam', loss='mean_squared_error')
     
     # ... and the viewer.
     viewer = BasicViewer(args.board_size, game.board_states, colors=not args.raw_text)

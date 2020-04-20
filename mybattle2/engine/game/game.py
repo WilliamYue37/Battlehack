@@ -4,9 +4,6 @@ from .team import Team
 from .robottype import RobotType
 from .constants import GameConstants
 
-team, robottype = -1, -1
-pawn_rand, lord_rand = [], []
-pawn_ins, pawn_outs, lord_ins, lord_outs = [], [], [], []
 batch_size = 20
 
 class PawnAction:
@@ -23,7 +20,7 @@ class PawnType:
 class Game:
 
     def __init__(self, code, board_size=GameConstants.BOARD_SIZE, max_rounds=GameConstants.MAX_ROUNDS, 
-                 seed=GameConstants.DEFAULT_SEED, sensor_radius=2, debug=False, colored_logs=True):
+                 seed=GameConstants.DEFAULT_SEED, sensor_radius=2, debug=False, colored_logs=True, model=None):
         random.seed(seed)
 
         self.code = code
@@ -55,6 +52,9 @@ class Game:
         self.special_turn = 10
         self.pawn_turns = random.randint(0, self.special_turn - 1)
         self.lord_turns = random.randint(0, self.special_turn - 1)
+
+        self.pawn_rand, self.lord_rand = [], []
+        self.pawn_ins, self.pawn_outs, self.lord_ins, self.lord_outs = [], [], [], []
 
     def delete_robot(self, i):
         robot = self.queue[i]
@@ -495,8 +495,6 @@ class Game:
         return invec
 
     def bot_turn(self, robot):
-        global team, robottype
-
         team = self.get_team(robot)
         robottype = self.get_type(robot)
 
@@ -536,8 +534,6 @@ class Game:
         bytecode = robot.runner.bytecode
 
     def turn(self):
-        global team, robottype
-
         if self.running:
             self.round += 1
 
@@ -668,6 +664,9 @@ class Game:
             # self.log_info(output)
 
             # raise GameError('game is over')
+    
+    def getTrainingData():
+        return pawn_ins, pawn_outs, lord_ins, lord_outs
 
 class RobotError(Exception):
     """Raised for illegal robot inputs"""
