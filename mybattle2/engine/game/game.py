@@ -4,6 +4,10 @@ from .team import Team
 from .robottype import RobotType
 from .constants import GameConstants
 
+import tensorflow as tf
+from tensorflow import keras
+import numpy as np
+
 batch_size = 20
 
 class PawnAction:
@@ -20,7 +24,7 @@ class PawnType:
 class Game:
 
     def __init__(self, code, board_size=GameConstants.BOARD_SIZE, max_rounds=GameConstants.MAX_ROUNDS, 
-                 seed=GameConstants.DEFAULT_SEED, sensor_radius=2, debug=False, colored_logs=True, model=None):
+                 seed=GameConstants.DEFAULT_SEED, sensor_radius=2, debug=False, colored_logs=True, pawn_model=None, lord_model=None):
         random.seed(seed)
 
         self.code = code
@@ -44,7 +48,7 @@ class Game:
         self.new_robot(None, None, Team.WHITE, RobotType.OVERLORD)
         self.new_robot(None, None, Team.BLACK, RobotType.OVERLORD)
 
-        self.board_states = []
+        # self.board_states = []
 
         # if self.debug:
         #     self.log_info(f'Seed: {seed}')
@@ -99,7 +103,7 @@ class Game:
             self.winner = Team.BLACK
 
         if not self.running:
-            self.board_states.append([row[:] for row in self.board])
+            # self.board_states.append([row[:] for row in self.board])
             self.process_over()
 
     def process_over(self):
@@ -612,7 +616,7 @@ class Game:
                     robot.turn()
 
             self.lords.reverse()  # the HQ's will alternate spawn order
-            self.board_states.append([row[:] for row in self.board])
+            # self.board_states.append([row[:] for row in self.board])
         else:
             in1, out1 = [], []
 
@@ -654,8 +658,8 @@ class Game:
 
             # raise GameError('game is over')
     
-    def getTrainingData():
-        return pawn_ins, pawn_outs, lord_ins, lord_outs
+    def getTrainingData(self):
+        return self.pawn_ins, self.pawn_outs, self.lord_ins, self.lord_outs
 
 class RobotError(Exception):
     """Raised for illegal robot inputs"""

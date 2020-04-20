@@ -21,7 +21,6 @@ class Robot:
         self.debug = False
 
     def animate(self, code, methods, debug=False):
-        print("methods: " + str(methods))
         self.runner = RobotRunner(code, methods, self.log, self.error, debug=debug)
         self.debug = debug
 

@@ -5,7 +5,7 @@ import sys
 import threading
 
 import tensorflow as tf
-from tf import keras
+from tensorflow import keras
 import numpy as np
 
 from mybattle2.engine import CodeContainer, Game, BasicViewer, GameConstants
@@ -79,13 +79,23 @@ def play_all(delay=0.8, keep_history=False, real_time=False):
 
 def train(num=1):
     for i in range(num):
+        print('training ' + str(i))
         game1 = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
-                seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, )
+                seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, pawn_model=pawn_model, lord_model=lord_model)
         while game1.running:
             game1.turn()
         pawn_ins, pawn_outs, lord_ins, lord_outs = game1.getTrainingData()
-    
-
+        pawn_total_loss, pawn_num_loss, lord_total_loss, lord_num_loss = 0, 0, 0, 0
+        for pawn_in, pawn_out in zip(pawn_ins, pawn_outs):
+            pawn_total_loss = pawn_model.train_on_batch(np.array(pawn_in), np.array(pawn_out))
+            pawn_num_loss += 1
+        for lord_in, lord_out in zip(lord_ins, lord_outs):
+            lord_total_loss = lord_model.train_on_batch(np.array(lord_in), np.array(lord_out))
+            lord_num_loss += 1
+        
+        print('pawn loss = ' + str(pawn_total_loss / pawn_num_loss))
+        print('lord loss = ' + str(lord_total_loss / lord_num_loss))
+        
 if __name__ == '__main__':
 
     # This is just for parsing the input to the script. Not important.
@@ -110,8 +120,8 @@ if __name__ == '__main__':
     code_container2 = CodeContainer.from_directory(args.player[1] if len(args.player) > 1 else args.player[0])
 
     # This is how you initialize a game,
-    game = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
-                seed=args.seed, debug=args.debug, colored_logs=not args.raw_text)
+    # game = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
+    #             seed=args.seed, debug=args.debug, colored_logs=not args.raw_text)
 
     pawn_model = keras.Sequential([
         keras.layers.Dense(64, input_dim=78),
@@ -128,16 +138,16 @@ if __name__ == '__main__':
     lord_model.compile(optimizer='adam', loss='mean_squared_error')
     
     # ... and the viewer.
-    viewer = BasicViewer(args.board_size, game.board_states, colors=not args.raw_text)
+    # viewer = BasicViewer(args.board_size, game.board_states, colors=not args.raw_text)
 
 
     # Here we check if the script is run using the -i flag.
     # If it is not, then we simply play the entire game.
-    if not sys.flags.interactive:
-        play_all(delay = float(args.delay), keep_history = args.raw_text, real_time = not args.debug)
+    # if not sys.flags.interactive:
+    #     play_all(delay = float(args.delay), keep_history = args.raw_text, real_time = not args.debug)
 
-    else:
-        # print out help message!
-        print("Run step() to step through the game.")
-        print("You also have access to the variables: game, viewer")
+    # else:
+    #     # print out help message!
+    #     print("Run step() to step through the game.")
+    #     print("You also have access to the variables: game, viewer")
 
