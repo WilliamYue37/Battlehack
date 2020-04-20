@@ -51,7 +51,7 @@ class Game:
 
         self.board_states = []
         
-        self.special_turn = 10
+        self.special_turn = 30
         self.pawn_turns = random.randint(0, self.special_turn - 1)
         self.lord_turns = random.randint(0, self.special_turn - 1)
 
@@ -509,12 +509,13 @@ class Game:
             sensed = self.sense(robot)
             mat = self.sensedToMat(r, c, sensed)
 
+            nr, nc = r, c
             if team == Team.BLACK:
                 mat = self.blackToWhiteMat(mat)
-                r = self.blackToWhiteR(r)
-                c = self.blackToWhiteC(c)
+                nr = self.blackToWhiteR(r)
+                nc = self.blackToWhiteC(c)
             
-            move = self.pawnMove(r, c, mat)
+            move = self.pawnMove(nr, nc, mat)
             if move == PawnAction.FORWARD:
                 self.move_forward(robot)
             elif move == PawnAction.CAPTURE_LEFT:
@@ -544,17 +545,22 @@ class Game:
         r, c = self.get_location(robot)
         sensed = self.sense(robot)
         mat = self.sensedToMat(r, c, sensed)
+        nr, nc = r, c
+        if team == Team.BLACK:
+            mat = self.blackToWhiteMat(mat)
+            nr = self.blackToWhiteR(r)
+            nc = self.blackToWhiteC(c)
 
         robot.logs.clear()
         robot.has_moved = False
 
         if self.pawn_turns % self.special_turn == 0:
             pot_moves = [PawnAction.PASS]
-            if r < self.board_size - 1 and mat[3][2] == PawnType.EMPTY:
+            if nr < self.board_size - 1 and mat[3][2] == PawnType.EMPTY:
                 pot_moves.append(PawnAction.FORWARD)
-            if r < self.board_size - 1 and c < self.board_size - 1 and mat[3][3] == opp_pawn:
+            if nr < self.board_size - 1 and nc < self.board_size - 1 and mat[3][3] == PawnType.BLACK:
                 pot_moves.append(PawnAction.CAPTURE_LEFT)
-            if r < self.board_size - 1 and c > 0 and mat[3][1] == opp_pawn:
+            if nr < self.board_size - 1 and nc > 0 and mat[3][1] == PawnType.BLACK:
                 pot_moves.append(PawnAction.CAPTURE_RIGHT)
 
             rand_move = random.choice(pot_moves)
@@ -562,11 +568,17 @@ class Game:
             if rand_move == PawnAction.FORWARD:
                 self.move_forward(robot)
             elif rand_move == PawnAction.CAPTURE_LEFT:
-                self.capture(robot, r + 1, c + 1)
+                if team == Team.WHITE:
+                    self.capture(robot, r + 1, c + 1)
+                else:
+                    self.capture(robot, r - 1, c + 1)
             elif rand_move == PawnAction.CAPTURE_RIGHT:
-                self.capture(robot, r + 1, c - 1)
+                if team == Team.WHITE:
+                    self.capture(robot, r + 1, c - 1)
+                else:
+                    self.capture(robot, r - 1, c - 1)
 
-            self.pawn_ins.append(self.pawnToInVec(r, c, mat, rand_move))
+            self.pawn_ins.append(self.pawnToInVec(nr, nc, mat, rand_move))
             self.pawn_teams.append(team)
         else:
             self.bot_turn(robot)
@@ -580,17 +592,21 @@ class Game:
         robot.has_moved = False
 
         if self.lord_turns % self.special_turn == 0:
+            mat = self.boardToMat(self.board)
+            if team == Team.BLACK:
+                mat = self.blackToWhiteMat(mat)
+
             pot_spawn = [-1]
             for c in range(self.board_size):
-                if not self.hq_check_space(0, c):
+                if mat[0][c] == PawnType.EMPTY:
                     pot_spawn.append(c)
             
             rand_spawn = random.choice(pot_spawn)
 
             if rand_spawn > -1:
-                self.spawn(robot, 0, rand_spawn)
+                self.spawn(robot, 0 if team == Team.WHITE else self.board_size - 1, rand_spawn)
 
-            self.lord_ins.append(self.lordToInVec(self.boardToMat(self.get_board())))
+            self.lord_ins.append(self.lordToInVec(mat))
             self.lord_teams.append(team)
         else:
             self.bot_turn(robot)

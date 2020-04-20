@@ -81,21 +81,16 @@ def train(num=1):
     for i in range(num):
         print('training ' + str(i))
         game1 = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
-                seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, pawn_model=pawn_model, lord_model=lord_model,
+                seed=None, debug=args.debug, colored_logs=not args.raw_text, pawn_model=pawn_model, lord_model=lord_model,
                 train_first=True, train_second=True)
         while game1.running:
             game1.turn()
         pawn_ins, pawn_outs, lord_ins, lord_outs = game1.getTrainingData()
-        pawn_total_loss, pawn_num_loss, lord_total_loss, lord_num_loss = 0, 0, 0, 0
-        for pawn_in, pawn_out in zip(pawn_ins, pawn_outs):
-            pawn_total_loss = pawn_model.train_on_batch(np.array(pawn_in), np.array(pawn_out))
-            pawn_num_loss += 1
-        for lord_in, lord_out in zip(lord_ins, lord_outs):
-            lord_total_loss = lord_model.train_on_batch(np.array(lord_in), np.array(lord_out))
-            lord_num_loss += 1
-        
-        print('pawn loss = ' + str(pawn_total_loss / pawn_num_loss))
-        print('lord loss = ' + str(lord_total_loss / lord_num_loss))
+        pawn_loss = pawn_model.fit(pawn_ins, pawn_outs, batch_size=20)
+        lord_loss = lord_model.fit(lord_ins, lord_outs, batch_size=20)
+    
+        # print('pawn loss = ' + str(pawn_loss))
+        # print('lord loss = ' + str(lord_loss))
         
 if __name__ == '__main__':
 
