@@ -6,6 +6,8 @@ from .constants import GameConstants
 
 team, robottype = -1, -1
 pawn_rand, lord_rand = [], []
+pawn_ins, pawn_outs, lord_ins, lord_outs = [], [], [], []
+batch_size = 20
 
 class PawnAction:
     PASS = 0
@@ -23,7 +25,6 @@ class Game:
     def __init__(self, code, board_size=GameConstants.BOARD_SIZE, max_rounds=GameConstants.MAX_ROUNDS, 
                  seed=GameConstants.DEFAULT_SEED, sensor_radius=2, debug=False, colored_logs=True):
         random.seed(seed)
-        # random.seed()
 
         self.code = code
 
@@ -474,6 +475,25 @@ class Game:
     def boardToMat(self, board):
         return [[PawnType.EMPTY if x is None else (PawnType.WHITE if x == Team.WHITE else PawnType.BLACK) for x in board[r]] for r in range(self.board_size)]
 
+    def pawnToInVec(self, data):
+        r, c, mat, action = data[0][0], data[0][1], data[0][2], data[1]
+        invec = [r / self.board_size, c / self.board_size, action]
+        for r in range(len(mat)):
+            for c in range(len(mat[r])):
+                if r == 2 and c == 2: continue
+                for k in range(3):
+                    invec.append(1 if mat[r][c] == k else 0)
+        return invec
+    
+    def lordToInVec(self, data):
+        mat = data[0]
+        invec = []
+        for r in range(len(mat)):
+            for c in range(len(mat[r])):
+                for k in range(3):
+                    invec.append(1 if mat[r][c] == k else 0)
+        return invec
+
     def bot_turn(self, robot):
         global team, robottype
 
@@ -596,25 +616,56 @@ class Game:
             self.lords.reverse()  # the HQ's will alternate spawn order
             self.board_states.append([row[:] for row in self.board])
         else:
-            self.log_info(str(self.winner) + ' wins')
+            in1, out1 = [], []
 
-            output = ''
-            for move in pawn_rand:
-                output += str(move[0][0]) + ' ' + str(move[0][1]) + ' ' + str(move[1]) + '\n'
-                for r in range(5):
-                    for c in range(5):
-                        output += str(move[0][2][r][c]) + ' '
-                    output += '\n'
-            self.log_info(output)
+            for i in range(len(pawn_rand)):
+                case = pawn_rand[i]
 
-            output = ''
-            for move in lord_rand:
-                output += str(move[1]) + '\n'
-                for r in range(len(move[0])):
-                    for c in range(len(move[0][r])):
-                        output += str(move[0][r][c]) + ' '
-                    output += '\n'
-            self.log_info(output)
+                invec = self.pawnToInVec(case)
+                outvec = [0 if self.winner == Team.WHITE else 1]
+
+                in1.append(invec)
+                out1.append(outvec)
+
+                if len(in1) == batch_size or i == len(pawn_rand) - 1:
+                    pawn_ins.append(in1)
+                    pawn_outs.append(out1)
+                    in1, out1 = [], []
+            
+            for i in range(len(lord_rand)):
+                case = lord_rand[i]
+
+                invec = self.lordToInVec(case)
+                outvec = [0 if self.winner == Team.WHITE else 1]
+
+                in1.append(invec)
+                out1.append(outvec)
+
+                if len(in1) == batch_size or i == len(lord_rand) - 1:
+                    lord_ins.append(in1)
+                    lord_outs.append(out1)
+                    in1, out1 = [], []
+                
+
+            # self.log_info(str(self.winner) + ' wins')
+
+            # output = ''
+            # for move in pawn_rand:
+            #     output += str(move[0][0]) + ' ' + str(move[0][1]) + ' ' + str(move[1]) + '\n'
+            #     for r in range(5):
+            #         for c in range(5):
+            #             output += str(move[0][2][r][c]) + ' '
+            #         output += '\n'
+            # self.log_info(output)
+
+            # output = ''
+            # for move in lord_rand:
+            #     output += str(move[1]) + '\n'
+            #     for r in range(len(move[0])):
+            #         for c in range(len(move[0][r])):
+            #             output += str(move[0][r][c]) + ' '
+            #         output += '\n'
+            # self.log_info(output)
 
             # raise GameError('game is over')
 
