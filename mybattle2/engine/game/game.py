@@ -53,7 +53,6 @@ class Game:
         self.pawn_turns = random.randint(0, self.special_turn - 1)
         self.lord_turns = random.randint(0, self.special_turn - 1)
 
-        self.pawn_rand, self.lord_rand = [], []
         self.pawn_ins, self.pawn_outs, self.lord_ins, self.lord_outs = [], [], [], []
 
     def delete_robot(self, i):
@@ -475,8 +474,7 @@ class Game:
     def boardToMat(self, board):
         return [[PawnType.EMPTY if x is None else (PawnType.WHITE if x == Team.WHITE else PawnType.BLACK) for x in board[r]] for r in range(self.board_size)]
 
-    def pawnToInVec(self, data):
-        r, c, mat, action = data[0][0], data[0][1], data[0][2], data[1]
+    def pawnToInVec(self, r, c, mat, action):
         invec = [r / self.board_size, c / self.board_size]
         for k in range(4):
             invec.append(1 if k == action else 0)
@@ -487,8 +485,7 @@ class Game:
                     invec.append(1 if mat[r][c] == k else 0)
         return invec
     
-    def lordToInVec(self, data):
-        mat = data[0]
+    def lordToInVec(self, mat):
         invec = []
         for r in range(len(mat)):
             for c in range(len(mat[r])):
@@ -573,8 +570,9 @@ class Game:
                             self.capture(robot, r + 1, c + 1)
                         elif rand_move == PawnAction.CAPTURE_RIGHT:
                             self.capture(robot, r + 1, c - 1)
-                        
-                        self.pawn_rand.append([[r, c, mat], rand_move])
+
+                        self.pawn_ins.append(self.pawnToInVec(r, c, mat, rand_move))
+                        self.pawn_outs.append([0 if self.winner == Team.WHITE else 1])
                     else:
                         self.bot_turn(robot)
                     
@@ -603,7 +601,9 @@ class Game:
                         rand_spawn = random.choice(pot_spawn)
                         if rand_spawn > -1:
                             self.spawn(robot, 0, rand_spawn)
-                        self.lord_rand.append([self.boardToMat(self.get_board()), rand_spawn])
+
+                        self.lord_ins.append(self.lordToInVec(self.boardToMat(self.get_board())))
+                        self.lord_outs.append([0 if self.winner == Team.WHITE else 1])
                     else:
                         self.bot_turn(robot)
                     
@@ -614,36 +614,7 @@ class Game:
             self.lords.reverse()  # the HQ's will alternate spawn order
             self.board_states.append([row[:] for row in self.board])
         else:
-            in1, out1 = [], []
-
-            for i in range(len(self.pawn_rand)):
-                case = self.pawn_rand[i]
-
-                invec = self.pawnToInVec(case)
-                outvec = [0 if self.winner == Team.WHITE else 1]
-
-                in1.append(invec)
-                out1.append(outvec)
-
-                if len(in1) == batch_size or i == len(self.pawn_rand) - 1:
-                    self.pawn_ins.append(in1)
-                    self.pawn_outs.append(out1)
-                    in1, out1 = [], []
-            
-            for i in range(len(self.lord_rand)):
-                case = self.lord_rand[i]
-
-                invec = self.lordToInVec(case)
-                outvec = [0 if self.winner == Team.WHITE else 1]
-
-                in1.append(invec)
-                out1.append(outvec)
-
-                if len(in1) == batch_size or i == len(self.lord_rand) - 1:
-                    self.lord_ins.append(in1)
-                    self.lord_outs.append(out1)
-                    in1, out1 = [], []
-                
+            pass
             # for batch in range(len(self.lord_ins)):
             #     for i in range(len(self.lord_ins[batch])):
             #         output = str(len(self.lord_ins[batch][i])) + ' '
