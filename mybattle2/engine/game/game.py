@@ -477,7 +477,9 @@ class Game:
 
     def pawnToInVec(self, data):
         r, c, mat, action = data[0][0], data[0][1], data[0][2], data[1]
-        invec = [r / self.board_size, c / self.board_size, action]
+        invec = [r / self.board_size, c / self.board_size]
+        for k in range(4):
+            invec.append(1 if k == action else 0)
         for r in range(len(mat)):
             for c in range(len(mat[r])):
                 if r == 2 and c == 2: continue
@@ -572,7 +574,7 @@ class Game:
                         elif rand_move == PawnAction.CAPTURE_RIGHT:
                             self.capture(robot, r + 1, c - 1)
                         
-                        pawn_rand.append([[r, c, mat], rand_move])
+                        self.pawn_rand.append([[r, c, mat], rand_move])
                     else:
                         self.bot_turn(robot)
                     
@@ -601,7 +603,7 @@ class Game:
                         rand_spawn = random.choice(pot_spawn)
                         if rand_spawn > -1:
                             self.spawn(robot, 0, rand_spawn)
-                        lord_rand.append([self.boardToMat(self.get_board()), rand_spawn])
+                        self.lord_rand.append([self.boardToMat(self.get_board()), rand_spawn])
                     else:
                         self.bot_turn(robot)
                     
@@ -614,8 +616,8 @@ class Game:
         else:
             in1, out1 = [], []
 
-            for i in range(len(pawn_rand)):
-                case = pawn_rand[i]
+            for i in range(len(self.pawn_rand)):
+                case = self.pawn_rand[i]
 
                 invec = self.pawnToInVec(case)
                 outvec = [0 if self.winner == Team.WHITE else 1]
@@ -623,13 +625,13 @@ class Game:
                 in1.append(invec)
                 out1.append(outvec)
 
-                if len(in1) == batch_size or i == len(pawn_rand) - 1:
-                    pawn_ins.append(in1)
-                    pawn_outs.append(out1)
+                if len(in1) == batch_size or i == len(self.pawn_rand) - 1:
+                    self.pawn_ins.append(in1)
+                    self.pawn_outs.append(out1)
                     in1, out1 = [], []
             
-            for i in range(len(lord_rand)):
-                case = lord_rand[i]
+            for i in range(len(self.lord_rand)):
+                case = self.lord_rand[i]
 
                 invec = self.lordToInVec(case)
                 outvec = [0 if self.winner == Team.WHITE else 1]
@@ -637,31 +639,18 @@ class Game:
                 in1.append(invec)
                 out1.append(outvec)
 
-                if len(in1) == batch_size or i == len(lord_rand) - 1:
-                    lord_ins.append(in1)
-                    lord_outs.append(out1)
+                if len(in1) == batch_size or i == len(self.lord_rand) - 1:
+                    self.lord_ins.append(in1)
+                    self.lord_outs.append(out1)
                     in1, out1 = [], []
                 
-
-            # self.log_info(str(self.winner) + ' wins')
-
-            # output = ''
-            # for move in pawn_rand:
-            #     output += str(move[0][0]) + ' ' + str(move[0][1]) + ' ' + str(move[1]) + '\n'
-            #     for r in range(5):
-            #         for c in range(5):
-            #             output += str(move[0][2][r][c]) + ' '
+            # for batch in range(len(self.lord_ins)):
+            #     for i in range(len(self.lord_ins[batch])):
+            #         output = str(len(self.lord_ins[batch][i])) + ' '
+            #         for j in self.lord_ins[batch][i]:
+            #             output += str(j) + ' '
             #         output += '\n'
-            # self.log_info(output)
-
-            # output = ''
-            # for move in lord_rand:
-            #     output += str(move[1]) + '\n'
-            #     for r in range(len(move[0])):
-            #         for c in range(len(move[0][r])):
-            #             output += str(move[0][r][c]) + ' '
-            #         output += '\n'
-            # self.log_info(output)
+            #         self.log_info(output)
 
             # raise GameError('game is over')
     
