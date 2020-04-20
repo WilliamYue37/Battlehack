@@ -81,7 +81,8 @@ def train(num=1):
     for i in range(num):
         print('training ' + str(i))
         game1 = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
-                seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, pawn_model=pawn_model, lord_model=lord_model)
+                seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, pawn_model=pawn_model, lord_model=lord_model,
+                train_first=True, train_second=True)
         while game1.running:
             game1.turn()
         pawn_ins, pawn_outs, lord_ins, lord_outs = game1.getTrainingData()
@@ -121,7 +122,8 @@ if __name__ == '__main__':
 
     # This is how you initialize a game,
     # game = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
-    #             seed=args.seed, debug=args.debug, colored_logs=not args.raw_text)
+    #             seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, pawn_model=None, lord_model=None,
+    #             train_first = True, train_second = False)
 
     pawn_model = keras.Sequential([
         keras.layers.Dense(64, input_dim=78),

@@ -24,7 +24,8 @@ class PawnType:
 class Game:
 
     def __init__(self, code, board_size=GameConstants.BOARD_SIZE, max_rounds=GameConstants.MAX_ROUNDS, 
-                 seed=GameConstants.DEFAULT_SEED, sensor_radius=2, debug=False, colored_logs=True, pawn_model=None, lord_model=None):
+                 seed=GameConstants.DEFAULT_SEED, sensor_radius=2, debug=False, colored_logs=True, pawn_model=None, lord_model=None,
+                 train_first=False, train_second=False):
         random.seed(seed)
 
         self.code = code
@@ -48,16 +49,17 @@ class Game:
         self.new_robot(None, None, Team.WHITE, RobotType.OVERLORD)
         self.new_robot(None, None, Team.BLACK, RobotType.OVERLORD)
 
-        # self.board_states = []
-
-        # if self.debug:
-        #     self.log_info(f'Seed: {seed}')
+        self.board_states = []
         
         self.special_turn = 10
         self.pawn_turns = random.randint(0, self.special_turn - 1)
         self.lord_turns = random.randint(0, self.special_turn - 1)
 
+        self.train_first = train_first
+        self.train_second = train_second
+
         self.pawn_ins, self.pawn_outs, self.lord_ins, self.lord_outs = [], [], [], []
+        self.pawn_teams, self.lord_teams = [], []
 
     def delete_robot(self, i):
         robot = self.queue[i]
@@ -102,7 +104,7 @@ class Game:
             self.winner = Team.BLACK
 
         if not self.running:
-            # self.board_states.append([row[:] for row in self.board])
+            self.board_states.append([row[:] for row in self.board])
             self.process_over()
 
     def process_over(self):
@@ -535,6 +537,65 @@ class Game:
                 self.spawn(robot, 0 if team == Team.WHITE else self.board_size - 1, move)
 
         bytecode = robot.runner.bytecode
+    
+    def pawn_move(self, robot):
+        team = self.get_team(robot)
+        opp_pawn = PawnType.BLACK if team == Team.WHITE else PawnType.WHITE
+        r, c = self.get_location(robot)
+        sensed = self.sense(robot)
+        mat = self.sensedToMat(r, c, sensed)
+
+        robot.logs.clear()
+        robot.has_moved = False
+
+        if self.pawn_turns % self.special_turn == 0:
+            pot_moves = [PawnAction.PASS]
+            if r < self.board_size - 1 and mat[3][2] == PawnType.EMPTY:
+                pot_moves.append(PawnAction.FORWARD)
+            if r < self.board_size - 1 and c < self.board_size - 1 and mat[3][3] == opp_pawn:
+                pot_moves.append(PawnAction.CAPTURE_LEFT)
+            if r < self.board_size - 1 and c > 0 and mat[3][1] == opp_pawn:
+                pot_moves.append(PawnAction.CAPTURE_RIGHT)
+
+            rand_move = random.choice(pot_moves)
+
+            if rand_move == PawnAction.FORWARD:
+                self.move_forward(robot)
+            elif rand_move == PawnAction.CAPTURE_LEFT:
+                self.capture(robot, r + 1, c + 1)
+            elif rand_move == PawnAction.CAPTURE_RIGHT:
+                self.capture(robot, r + 1, c - 1)
+
+            self.pawn_ins.append(self.pawnToInVec(r, c, mat, rand_move))
+            self.pawn_teams.append(team)
+        else:
+            self.bot_turn(robot)
+        
+        self.pawn_turns += 1
+    
+    def lord_move(self, robot):
+        team = self.get_team(robot)
+
+        robot.logs.clear()
+        robot.has_moved = False
+
+        if self.lord_turns % self.special_turn == 0:
+            pot_spawn = [-1]
+            for c in range(self.board_size):
+                if not self.hq_check_space(0, c):
+                    pot_spawn.append(c)
+            
+            rand_spawn = random.choice(pot_spawn)
+
+            if rand_spawn > -1:
+                self.spawn(robot, 0, rand_spawn)
+
+            self.lord_ins.append(self.lordToInVec(self.boardToMat(self.get_board())))
+            self.lord_teams.append(team)
+        else:
+            self.bot_turn(robot)
+        
+        self.lord_turns += 1
 
     def turn(self):
         if self.running:
@@ -546,45 +607,14 @@ class Game:
         for i in range(self.robot_count):
             if i in self.queue:
                 robot = self.queue[i]
+                team = self.get_team(robot)
 
-                if robot.team == Team.WHITE:
-                    team = self.get_team(robot)
-                    robottype = self.get_type(robot)
-                    r, c = self.get_location(robot)
-                    sensed = self.sense(robot)
-                    mat = self.sensedToMat(r, c, sensed)
-
-                    robot.logs.clear()
-                    robot.has_moved = False
-
-                    if self.pawn_turns % self.special_turn == 0:
-                        pot_moves = [PawnAction.PASS]
-                        if r < self.board_size - 1 and mat[3][2] == PawnType.EMPTY:
-                            pot_moves.append(PawnAction.FORWARD)
-                        if r < self.board_size - 1 and c < self.board_size - 1 and mat[3][3] == PawnType.BLACK:
-                            pot_moves.append(PawnAction.CAPTURE_LEFT)
-                        if r < self.board_size - 1 and c > 0 and mat[3][1] == PawnType.BLACK:
-                            pot_moves.append(PawnAction.CAPTURE_RIGHT)
-
-                        rand_move = random.choice(pot_moves)
-
-                        if rand_move == PawnAction.FORWARD:
-                            self.move_forward(robot)
-                        elif rand_move == PawnAction.CAPTURE_LEFT:
-                            self.capture(robot, r + 1, c + 1)
-                        elif rand_move == PawnAction.CAPTURE_RIGHT:
-                            self.capture(robot, r + 1, c - 1)
-
-                        self.pawn_ins.append(self.pawnToInVec(r, c, mat, rand_move))
-                        self.pawn_outs.append([0 if self.winner == Team.WHITE else 1])
-                    else:
-                        self.bot_turn(robot)
-                    
-                    self.pawn_turns += 1
+                if team == Team.WHITE and self.train_first or team == Team.BLACK and self.train_second:
+                    self.pawn_move(robot)
                 else:
                     robot.turn()
 
-                if not robot.runner.initialized and team == Team.BLACK:
+                if not robot.runner.initialized and (team == Team.WHITE and not self.train_first or team == Team.BLACK and not self.train_second):
                     self.delete_robot(i)
                 self.check_over()
 
@@ -592,40 +622,18 @@ class Game:
             for robot in self.lords:
                 team = self.get_team(robot)
 
-                robot.logs.clear()
-                robot.has_moved = False
-
-                if team == Team.WHITE:
-                    if self.lord_turns % self.special_turn == 0:
-                        pot_spawn = [-1]
-                        for c in range(self.board_size):
-                            if not self.hq_check_space(0, c):
-                                pot_spawn.append(c)
-                        
-                        rand_spawn = random.choice(pot_spawn)
-                        if rand_spawn > -1:
-                            self.spawn(robot, 0, rand_spawn)
-
-                        self.lord_ins.append(self.lordToInVec(self.boardToMat(self.get_board())))
-                        self.lord_outs.append([0 if self.winner == Team.WHITE else 1])
-                    else:
-                        self.bot_turn(robot)
-                    
-                    self.lord_turns += 1
+                if team == Team.WHITE and self.train_first or team == Team.BLACK and self.train_second:
+                    self.lord_move(robot)
                 else:
                     robot.turn()
 
             self.lords.reverse()  # the HQ's will alternate spawn order
-            # self.board_states.append([row[:] for row in self.board])
+            self.board_states.append([row[:] for row in self.board])
         else:
-            pass
-            # for batch in range(len(self.lord_ins)):
-            #     for i in range(len(self.lord_ins[batch])):
-            #         output = str(len(self.lord_ins[batch][i])) + ' '
-            #         for j in self.lord_ins[batch][i]:
-            #             output += str(j) + ' '
-            #         output += '\n'
-            #         self.log_info(output)
+            for i in self.pawn_teams:
+                self.pawn_outs.append([1 if i == self.winner else 0])
+            for i in self.lord_teams:
+                self.lord_outs.append([1 if i == self.winner else 0])
 
             # raise GameError('game is over')
     
