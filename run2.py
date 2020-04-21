@@ -7,8 +7,10 @@ import threading
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
+from tensorflow.keras.models import load_model
 
 from mybattle2.engine import CodeContainer, Game, BasicViewer, GameConstants
+from mybattle2.engine.game import Team
 
 """
 This is a simple script for running bots and debugging them.
@@ -83,8 +85,19 @@ def train(num=1):
         game1 = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
                 seed=None, debug=args.debug, colored_logs=not args.raw_text, pawn_model=pawn_model, lord_model=lord_model,
                 train_first=True, train_second=True)
+        t = 0
         while game1.running:
+            print("turn: " + str(t))
             game1.turn()
+
+            board = game1.get_board()
+            for row in board:
+                print('#', end='')
+                for x in row:
+                    print(' ' if x is None else 1 if x == Team.WHITE else 2, end='')
+                print('#')
+            t += 1
+
         pawn_ins, pawn_outs, lord_ins, lord_outs = game1.getTrainingData()
         pawn_loss = pawn_model.fit(pawn_ins, pawn_outs, batch_size=20)
         lord_loss = lord_model.fit(lord_ins, lord_outs, batch_size=20)
@@ -116,23 +129,31 @@ if __name__ == '__main__':
     code_container2 = CodeContainer.from_directory(args.player[1] if len(args.player) > 1 else args.player[0])
 
     # This is how you initialize a game,
-    # game = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
-    #             seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, pawn_model=None, lord_model=None,
-    #             train_first = True, train_second = False)
+    game = Game([code_container1, code_container2], board_size=args.board_size, max_rounds=args.max_rounds, 
+                seed=args.seed, debug=args.debug, colored_logs=not args.raw_text, pawn_model=None, lord_model=None,
+                train_first = True, train_second = False)
 
-    pawn_model = keras.Sequential([
-        keras.layers.Dense(64, input_dim=78),
-        keras.layers.Dense(64, activation='relu'),
-        keras.layers.Dense(1)
-    ])
-    pawn_model.compile(optimizer='adam', loss='mean_squared_error')
+    pawn_model = load_model('pawn_model_2.h5')
+    lord_model = load_model('lord_model_2.h5')
 
-    lord_model = keras.Sequential([
-        keras.layers.Dense(64, input_dim=16*16*3),
-        keras.layers.Dense(64, activation='relu'),
-        keras.layers.Dense(1)
-    ])
-    lord_model.compile(optimizer='adam', loss='mean_squared_error')
+    r, c = 7, 7
+    mat = [[0,0,0,0,0], [0,1,0,0,2], [1,1,0,2,2], [2,0,1,2,0], [0,0,1,1,1]]
+    for action in range(4):
+        print(pawn_model.predict(np.array([game.pawnToInVec(r, c, mat, action)])))
+
+    # pawn_model = keras.Sequential([
+    #     keras.layers.Dense(32, input_dim=78),
+    #     keras.layers.Dense(16, activation='relu'),
+    #     keras.layers.Dense(1)
+    # ])
+    # pawn_model.compile(optimizer='adam', loss='mean_squared_error')
+
+    # lord_model = keras.Sequential([
+    #     keras.layers.Dense(32, input_dim=16*16*3),
+    #     keras.layers.Dense(16, activation='relu'),
+    #     keras.layers.Dense(1)
+    # ])
+    # lord_model.compile(optimizer='adam', loss='mean_squared_error')
     
     # ... and the viewer.
     # viewer = BasicViewer(args.board_size, game.board_states, colors=not args.raw_text)

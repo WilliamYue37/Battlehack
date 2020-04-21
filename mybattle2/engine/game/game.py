@@ -61,6 +61,9 @@ class Game:
         self.pawn_ins, self.pawn_outs, self.lord_ins, self.lord_outs = [], [], [], []
         self.pawn_teams, self.lord_teams = [], []
 
+        self.pawn_model = pawn_model
+        self.lord_model = lord_model
+
     def delete_robot(self, i):
         robot = self.queue[i]
         self.board[robot.row][robot.col] = None
@@ -419,47 +422,7 @@ class Game:
 
 
     def inversePawnType(self, pawnType):
-        return 0 if pawnType == PawnType.EMPTY else (PawnType.BLACK if pawnType == PawnType.WHITE else PawnType.WHITE)
-
-    # you are at (2, 2)
-    # r and c are already transformed from the original location of the pawn
-    def pawnMove(self, r, c, mat):
-        if mat[3][3] == PawnType.BLACK:
-            return PawnAction.CAPTURE_LEFT
-        elif mat[3][1] == PawnType.BLACK:
-            return PawnAction.CAPTURE_RIGHT
-        elif mat[3][2] == PawnType.EMPTY and mat[4][1] != PawnType.BLACK and mat[4][3] != PawnType.BLACK and r + 1 < self.board_size:
-            return PawnAction.FORWARD
-        else:
-            return PawnAction.PASS
-
-    # mat is white
-    # return the column to spawn on relative to mat
-    # -1 if no spawn 
-    def lordMove(self, mat):
-        ret = -1
-        retv = -1
-        for c in range(self.board_size):
-            if mat[0][c] != PawnType.EMPTY:
-                continue
-            if c - 1 >= 0 and mat[1][c - 1] == PawnType.BLACK or c + 1 < self.board_size and mat[1][c + 1] == PawnType.BLACK:
-                continue
-
-            v = self.board_size
-            for r in range(self.board_size):
-                if mat[r][c] == PawnType.WHITE:
-                    v = r
-                    break
-
-                elif mat[r][c] == PawnType.BLACK:
-                    v = 100 + (self.board_size - r)
-                    break
-
-            if v > retv:
-                ret = c
-                retv = v
-        return ret
-                
+        return 0 if pawnType == PawnType.EMPTY else (PawnType.BLACK if pawnType == PawnType.WHITE else PawnType.WHITE)      
 
     def blackToWhiteMat(self, mat):
         return [[self.inversePawnType(x) for x in mat[len(mat) - 1 - r]] for r in range(len(mat))]
@@ -499,6 +462,90 @@ class Game:
                     invec.append(1 if mat[r][c] == k else 0)
         return invec
 
+    # you are at (2, 2)
+    # r and c are already transformed from the original location of the pawn
+    def pawnMove(self, r, c, mat):
+        if self.pawn_model is None:
+            if mat[3][3] == PawnType.BLACK:
+                return PawnAction.CAPTURE_LEFT
+            elif mat[3][1] == PawnType.BLACK:
+                return PawnAction.CAPTURE_RIGHT
+            elif mat[3][2] == PawnType.EMPTY and mat[4][1] != PawnType.BLACK and mat[4][3] != PawnType.BLACK and r + 1 < self.board_size:
+                return PawnAction.FORWARD
+            else:
+                return PawnAction.PASS
+        else:
+            pot_moves = [PawnAction.PASS]
+            if mat[3][3] == PawnType.BLACK:
+                pot_moves.append(PawnAction.CAPTURE_LEFT)
+            elif mat[3][1] == PawnType.BLACK:
+                pot_moves.append(PawnAction.CAPTURE_RIGHT)
+            elif mat[3][2] == PawnType.EMPTY and r + 1 < self.board_size:
+                return PawnAction.FORWARD
+            
+            if len(pot_moves) == 1:
+                return pot_moves[0]
+            
+            best_move, best_value = None, -float("inf")
+            for move in pot_moves:
+                value = self.pawn_model.predict(np.array([self.pawnToInVec(r, c, mat, move)]))[0][0]
+                if value > best_value:
+                    best_move = move
+                    best_value = value
+            
+            return best_move
+                
+
+    # mat is white
+    # return the column to spawn on relative to mat
+    # -1 if no spawn 
+    def lordMove(self, mat):
+        if self.lord_model is None:
+            ret = -1
+            retv = -1
+            for c in range(self.board_size):
+                if mat[0][c] != PawnType.EMPTY:
+                    continue
+                if c - 1 >= 0 and mat[1][c - 1] == PawnType.BLACK or c + 1 < self.board_size and mat[1][c + 1] == PawnType.BLACK:
+                    continue
+
+                v = self.board_size
+                for r in range(self.board_size):
+                    if mat[r][c] == PawnType.WHITE:
+                        v = r
+                        break
+
+                    elif mat[r][c] == PawnType.BLACK:
+                        v = 100 + (self.board_size - r)
+                        break
+
+                if v > retv:
+                    ret = c
+                    retv = v
+            return ret
+        else:
+            pot_moves = [-1]
+            for c in range(self.board_size):
+                if mat[0][c] == PawnType.EMPTY:
+                    pot_moves.append(c)
+
+            if len(pot_moves) == 1:
+                return pot_moves[0]
+
+            best_move, best_value = None, -float("inf")
+            for move in pot_moves:
+                if move >= 0:
+                    mat[0][move] = PawnType.WHITE
+                new_value = self.lord_model.predict(np.array([self.lordToInVec(mat)]))[0][0]
+                if move >= 0:
+                    mat[0][move] = PawnType.EMPTY
+                if new_value > best_value:
+                    best_move = move
+                    best_value = new_value
+            return best_move
+                
+            
+    
     def bot_turn(self, robot):
         team = self.get_team(robot)
         robottype = self.get_type(robot)
